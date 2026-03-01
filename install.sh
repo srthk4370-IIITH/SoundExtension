@@ -30,34 +30,51 @@ if [[ ! -f "$TARGET_SOUND_PATH" ]]; then
     exit 1
 fi
 
-# Remove old install
+# Remove previous install
 if grep -q "$MARKER_START" "$RC_FILE"; then
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$RC_FILE"
 fi
 
-# Sound backend
+# Backend-specific play_failure_sound
 if [[ "$IS_WSL" == true ]]; then
-    SOUND_FUNCTION='
+
+SOUND_FUNCTION=$(cat <<'EOF'
 play_failure_sound() {
     WIN_USER=$(cmd.exe /c echo %USERNAME% | tr -d "\r")
     WIN_PATH="C:\\Users\\$WIN_USER\\failure.wav"
-    powershell.exe -c "(New-Object Media.SoundPlayer '\''$WIN_PATH'\'').PlaySync();" \
+
+    powershell.exe -c "(New-Object Media.SoundPlayer '$WIN_PATH').PlaySync();" \
         >/dev/null 2>&1 &
 }
-'
+EOF
+)
+
+elif [[ "$OS" == "Darwin" ]]; then
+
+SOUND_FUNCTION=$(cat <<'EOF'
+play_failure_sound() {
+    afplay "$HOME/failure.wav" >/dev/null 2>&1 &
+}
+EOF
+)
+
 else
-    SOUND_FUNCTION='
+
+SOUND_FUNCTION=$(cat <<'EOF'
 play_failure_sound() {
     paplay "$HOME/failure.wav" >/dev/null 2>&1 &
 }
-'
+EOF
+)
+
 fi
 
-# Inject working hook
+# Inject EXACT working hook block
 {
 echo "$MARKER_START"
 echo
 echo "$SOUND_FUNCTION"
+echo
 
 cat <<'HOOK_BLOCK'
 
@@ -74,7 +91,7 @@ trap '
 
 __compiler_failure_hook() {
 
-    # Trim leading whitespace
+    # trim leading whitespace
     local cmd="${__last_command#"${__last_command%%[![:space:]]*}"}"
     local raw_word="${cmd%% *}"
     local first_word="$(basename "$raw_word")"
