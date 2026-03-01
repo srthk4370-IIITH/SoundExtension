@@ -9,7 +9,7 @@ HOOK_NAME="failure-hook"
 SOUND_FILE="failure.wav"
 TARGET_SOUND_PATH="$HOME/$SOUND_FILE"
 
-# 🔴 Replace only if repo name changes
+# 🔴 Update if repo changes
 REPO_RAW_BASE="https://raw.githubusercontent.com/srthk4370-IIITH/SoundExtension/main"
 
 echo "Installing $HOOK_NAME..."
@@ -21,7 +21,7 @@ if [[ "$OS" == "Linux" ]] && grep -qi microsoft /proc/version 2>/dev/null; then
     IS_WSL=true
 fi
 
-# Detect shell rc file
+# Detect shell config file
 if [[ "$SHELL" == *"bash"* ]]; then
     RC_FILE="$HOME/.bashrc"
 elif [[ "$SHELL" == *"zsh"* ]]; then
@@ -41,13 +41,13 @@ if [[ ! -f "$TARGET_SOUND_PATH" ]]; then
     exit 1
 fi
 
-# Remove existing installation block
+# Remove previous install if exists
 if grep -q "$MARKER_START" "$RC_FILE"; then
     echo "Existing installation detected. Updating..."
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$RC_FILE"
 fi
 
-# Determine sound backend
+# Sound backend
 if [[ "$OS" == "Darwin" ]]; then
     SOUND_FUNCTION='
 play_failure_sound() {
@@ -72,7 +72,7 @@ play_failure_sound() {
 '
 fi
 
-# Write hook block safely
+# Inject hook block safely
 {
 echo "$MARKER_START"
 echo
@@ -80,19 +80,27 @@ echo "$SOUND_FUNCTION"
 
 cat <<'HOOK_BLOCK'
 
+__last_command=""
+__last_status=0
+
+trap '__last_status=$?; __last_command="$BASH_COMMAND"' DEBUG
+
 __compiler_failure_hook() {
-    local status=$?
-    local last_cmd=$(fc -ln -1)
-    local first_word="${last_cmd%% *}"
+
+    # trim leading whitespace
+    local cmd="${__last_command#"${__last_command%%[![:space:]]*}"}"
+
+    local raw_word="${cmd%% *}"
+    local first_word="$(basename "$raw_word")"
 
     case "$first_word" in
         gcc|g++|clang|clang++|make|cmake|javac|rustc|cargo|go)
-            if [ $status -ne 0 ]; then
+            if [ $__last_status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
         ./*)
-            if [ -x "$first_word" ] && [ $status -ne 0 ]; then
+            if [ -x "$raw_word" ] && [ $__last_status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
