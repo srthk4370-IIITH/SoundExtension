@@ -5,6 +5,9 @@ $HookName = "failure-hook"
 $SoundFile = "failure.wav"
 $TargetSoundPath = Join-Path $env:USERPROFILE $SoundFile
 
+# 🔴 IMPORTANT — Replace this
+$RepoRawBase = "https://raw.githubusercontent.com/YOUR_USERNAME/failure-hook/main"
+
 Write-Host "Installing $HookName..."
 
 # Ensure profile exists
@@ -13,15 +16,16 @@ if (!(Test-Path $PROFILE)) {
     Write-Host "Created PowerShell profile at $PROFILE"
 }
 
-# Copy sound file
-$InstallerDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$SourceSoundPath = Join-Path $InstallerDir $SoundFile
+# Download sound file directly from GitHub
+$SoundUrl = "$RepoRawBase/$SoundFile"
 
-if (Test-Path $SourceSoundPath) {
-    Copy-Item $SourceSoundPath $TargetSoundPath -Force
-    Write-Host "Copied $SoundFile to $TargetSoundPath"
-} else {
-    Write-Host "ERROR: $SoundFile not found in installer directory."
+Write-Host "Downloading $SoundFile..."
+
+try {
+    Invoke-WebRequest -Uri $SoundUrl -OutFile $TargetSoundPath -UseBasicParsing
+    Write-Host "Downloaded to $TargetSoundPath"
+} catch {
+    Write-Host "ERROR: Failed to download sound file."
     exit 1
 }
 
@@ -51,7 +55,6 @@ function global:prompt {
 
     \$lastExit = \$LASTEXITCODE
 
-    # Get last command line
     \$lastCommand = (Get-History -Count 1).CommandLine
     if (-not \$lastCommand) {
         return "PS " + (Get-Location) + "> "
