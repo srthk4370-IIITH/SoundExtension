@@ -94,7 +94,7 @@ __compiler_failure_hook() {
     esac
 }
 
-PROMPT_COMMAND="__compiler_failure_hook"
+PROMPT_COMMAND="__compiler_failure_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 
 $MARKER_END
 
