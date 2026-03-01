@@ -35,7 +35,7 @@ if grep -q "$MARKER_START" "$RC_FILE"; then
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$RC_FILE"
 fi
 
-# Backend-specific play_failure_sound
+# Backend selection
 if [[ "$IS_WSL" == true ]]; then
 
 SOUND_FUNCTION=$(cat <<'EOF'
@@ -43,8 +43,8 @@ play_failure_sound() {
     WIN_USER=$(cmd.exe /c echo %USERNAME% | tr -d "\r")
     WIN_PATH="C:\\Users\\$WIN_USER\\failure.wav"
 
-    powershell.exe -c "(New-Object Media.SoundPlayer '$WIN_PATH').PlaySync();" \
-        >/dev/null 2>&1 &
+    (powershell.exe -c "(New-Object Media.SoundPlayer '$WIN_PATH').PlaySync();" \
+        >/dev/null 2>&1 & disown)
 }
 EOF
 )
@@ -53,7 +53,7 @@ elif [[ "$OS" == "Darwin" ]]; then
 
 SOUND_FUNCTION=$(cat <<'EOF'
 play_failure_sound() {
-    afplay "$HOME/failure.wav" >/dev/null 2>&1 &
+    (afplay "$HOME/failure.wav" >/dev/null 2>&1 & disown)
 }
 EOF
 )
@@ -62,14 +62,14 @@ else
 
 SOUND_FUNCTION=$(cat <<'EOF'
 play_failure_sound() {
-    paplay "$HOME/failure.wav" >/dev/null 2>&1 &
+    (paplay "$HOME/failure.wav" >/dev/null 2>&1 & disown)
 }
 EOF
 )
 
 fi
 
-# Inject EXACT working hook block
+# Inject EXACT working block
 {
 echo "$MARKER_START"
 echo
@@ -78,32 +78,25 @@ echo
 
 cat <<'HOOK_BLOCK'
 
-__last_command=""
-__last_status=0
-
-trap '
-    exit_code=$?
-    if [[ "$BASH_COMMAND" != "__compiler_failure_hook"* ]]; then
-        __last_status=$exit_code
-        __last_command="$BASH_COMMAND"
-    fi
-' DEBUG
-
 __compiler_failure_hook() {
 
+    local status=$?
+    local last_cmd=$(history 1)
+    last_cmd="${last_cmd#*[0-9]  }"
+
     # trim leading whitespace
-    local cmd="${__last_command#"${__last_command%%[![:space:]]*}"}"
-    local raw_word="${cmd%% *}"
+    last_cmd="${last_cmd#"${last_cmd%%[![:space:]]*}"}"
+    local raw_word="${last_cmd%% *}"
     local first_word="$(basename "$raw_word")"
 
     case "$first_word" in
         gcc|g++|clang|clang++|make|cmake|javac|rustc|cargo|go)
-            if [ $__last_status -ne 0 ]; then
+            if [ $status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
         ./*)
-            if [ -x "$raw_word" ] && [ $__last_status -ne 0 ]; then
+            if [ -x "$raw_word" ] && [ $status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
