@@ -9,7 +9,7 @@ HOOK_NAME="failure-hook"
 SOUND_FILE="failure.wav"
 TARGET_SOUND_PATH="$HOME/$SOUND_FILE"
 
-# 🔴 Replace with your repo
+# 🔴 Replace only if repo name changes
 REPO_RAW_BASE="https://raw.githubusercontent.com/srthk4370-IIITH/SoundExtension/main"
 
 echo "Installing $HOOK_NAME..."
@@ -21,6 +21,7 @@ if [[ "$OS" == "Linux" ]] && grep -qi microsoft /proc/version 2>/dev/null; then
     IS_WSL=true
 fi
 
+# Detect shell rc file
 if [[ "$SHELL" == *"bash"* ]]; then
     RC_FILE="$HOME/.bashrc"
 elif [[ "$SHELL" == *"zsh"* ]]; then
@@ -40,11 +41,13 @@ if [[ ! -f "$TARGET_SOUND_PATH" ]]; then
     exit 1
 fi
 
+# Remove existing installation block
 if grep -q "$MARKER_START" "$RC_FILE"; then
     echo "Existing installation detected. Updating..."
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$RC_FILE"
 fi
 
+# Determine sound backend
 if [[ "$OS" == "Darwin" ]]; then
     SOUND_FUNCTION='
 play_failure_sound() {
@@ -69,25 +72,27 @@ play_failure_sound() {
 '
 fi
 
-cat <<EOF >> "$RC_FILE"
+# Write hook block safely
+{
+echo "$MARKER_START"
+echo
+echo "$SOUND_FUNCTION"
 
-$MARKER_START
-
-$SOUND_FUNCTION
+cat <<'HOOK_BLOCK'
 
 __compiler_failure_hook() {
-    local status=\$?
-    local last_cmd=\$(fc -ln -1)
-    local first_word="\${last_cmd%% *}"
+    local status=$?
+    local last_cmd=$(fc -ln -1)
+    local first_word="${last_cmd%% *}"
 
-    case "\$first_word" in
+    case "$first_word" in
         gcc|g++|clang|clang++|make|cmake|javac|rustc|cargo|go)
-            if [ \$status -ne 0 ]; then
+            if [ $status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
         ./*)
-            if [ -x "\$first_word" ] && [ \$status -ne 0 ]; then
+            if [ -x "$first_word" ] && [ $status -ne 0 ]; then
                 play_failure_sound
             fi
             ;;
@@ -96,9 +101,11 @@ __compiler_failure_hook() {
 
 PROMPT_COMMAND="__compiler_failure_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 
-$MARKER_END
+HOOK_BLOCK
 
-EOF
+echo
+echo "$MARKER_END"
+} >> "$RC_FILE"
 
 echo "Installation complete."
 echo "Restart terminal or run: source $RC_FILE"
