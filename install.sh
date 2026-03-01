@@ -9,9 +9,11 @@ HOOK_NAME="failure-hook"
 SOUND_FILE="failure.wav"
 TARGET_SOUND_PATH="$HOME/$SOUND_FILE"
 
+# 🔴 Replace with your repo
+REPO_RAW_BASE="https://raw.githubusercontent.com/srthk4370-IIITH/SoundExtension/main"
+
 echo "Installing $HOOK_NAME..."
 
-# Detect OS
 OS="$(uname)"
 
 IS_WSL=false
@@ -19,7 +21,6 @@ if [[ "$OS" == "Linux" ]] && grep -qi microsoft /proc/version 2>/dev/null; then
     IS_WSL=true
 fi
 
-# Detect shell config file
 if [[ "$SHELL" == *"bash"* ]]; then
     RC_FILE="$HOME/.bashrc"
 elif [[ "$SHELL" == *"zsh"* ]]; then
@@ -29,27 +30,21 @@ else
     exit 1
 fi
 
-echo "Detected shell config: $RC_FILE"
-
-# Ensure RC file exists
 touch "$RC_FILE"
 
-# Copy sound file
-if [[ -f "$SOUND_FILE" ]]; then
-    cp "$SOUND_FILE" "$TARGET_SOUND_PATH"
-    echo "Copied $SOUND_FILE to $TARGET_SOUND_PATH"
-else
-    echo "ERROR: $SOUND_FILE not found in installer directory."
+echo "Downloading $SOUND_FILE..."
+curl -fsSL "$REPO_RAW_BASE/$SOUND_FILE" -o "$TARGET_SOUND_PATH"
+
+if [[ ! -f "$TARGET_SOUND_PATH" ]]; then
+    echo "ERROR: Failed to download sound file."
     exit 1
 fi
 
-# Remove existing installation block (idempotent)
 if grep -q "$MARKER_START" "$RC_FILE"; then
     echo "Existing installation detected. Updating..."
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$RC_FILE"
 fi
 
-# Determine sound backend
 if [[ "$OS" == "Darwin" ]]; then
     SOUND_FUNCTION='
 play_failure_sound() {
@@ -74,7 +69,6 @@ play_failure_sound() {
 '
 fi
 
-# Append hook
 cat <<EOF >> "$RC_FILE"
 
 $MARKER_START
@@ -107,4 +101,4 @@ $MARKER_END
 EOF
 
 echo "Installation complete."
-echo "Restart your terminal or run: source $RC_FILE"
+echo "Restart terminal or run: source $RC_FILE"
