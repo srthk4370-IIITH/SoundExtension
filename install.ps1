@@ -5,8 +5,8 @@ $HookName = "failure-hook"
 $SoundFile = "failure.wav"
 $TargetSoundPath = Join-Path $env:USERPROFILE $SoundFile
 
-# 🔴 IMPORTANT — Replace this
-$RepoRawBase = "https://raw.githubusercontent.com/YOUR_USERNAME/failure-hook/main"
+# 🔴 Replace this with your real repo
+$RepoRawBase = "https://raw.githubusercontent.com/srthk4370-IIITH/SoundExtension/main"
 
 Write-Host "Installing $HookName..."
 
@@ -16,7 +16,7 @@ if (!(Test-Path $PROFILE)) {
     Write-Host "Created PowerShell profile at $PROFILE"
 }
 
-# Download sound file directly from GitHub
+# Download sound file
 $SoundUrl = "$RepoRawBase/$SoundFile"
 
 Write-Host "Downloading $SoundFile..."
@@ -29,7 +29,7 @@ try {
     exit 1
 }
 
-# Remove existing installation block (idempotent)
+# Remove existing installation
 $ProfileContent = Get-Content $PROFILE -Raw
 
 if ($ProfileContent -match [regex]::Escape($MarkerStart)) {
@@ -39,37 +39,36 @@ if ($ProfileContent -match [regex]::Escape($MarkerStart)) {
     Set-Content $PROFILE $ProfileContent
 }
 
-# Append hook block
-Add-Content $PROFILE @"
-
-$MarkerStart
+# Append hook block (IMPORTANT: single-quoted here-string)
+Add-Content $PROFILE @'
+# >>> failure-hook START >>>
 
 function Play-FailureSound {
     try {
-        \$player = New-Object System.Media.SoundPlayer "$TargetSoundPath"
-        \$player.Play()
+        $player = New-Object System.Media.SoundPlayer "$env:USERPROFILE\failure.wav"
+        $player.Play()
     } catch {}
 }
 
 function global:prompt {
 
-    \$lastExit = \$LASTEXITCODE
+    $lastExit = $LASTEXITCODE
 
-    \$lastCommand = (Get-History -Count 1).CommandLine
-    if (-not \$lastCommand) {
+    $lastCommand = (Get-History -Count 1).CommandLine
+    if (-not $lastCommand) {
         return "PS " + (Get-Location) + "> "
     }
 
-    \$firstWord = \$lastCommand.Split(" ")[0]
+    $firstWord = $lastCommand.Split(" ")[0]
 
-    switch -Regex (\$firstWord) {
+    switch -Regex ($firstWord) {
         "^(gcc|g\+\+|clang|clang\+\+|make|cmake|javac|rustc|cargo|go)$" {
-            if (\$lastExit -ne 0) {
+            if ($lastExit -ne 0) {
                 Play-FailureSound
             }
         }
-        "^\.\\.*" {
-            if (Test-Path \$firstWord -PathType Leaf -and \$lastExit -ne 0) {
+        "^\.\\" {
+            if (Test-Path $firstWord -PathType Leaf -and $lastExit -ne 0) {
                 Play-FailureSound
             }
         }
@@ -78,9 +77,8 @@ function global:prompt {
     return "PS " + (Get-Location) + "> "
 }
 
-$MarkerEnd
-
-"@
+# <<< failure-hook END <<<
+'@
 
 Write-Host "Installation complete."
 Write-Host "Restart PowerShell."
