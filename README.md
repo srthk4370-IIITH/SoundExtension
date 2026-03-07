@@ -4,7 +4,8 @@ curl -fsSL https://raw.githubusercontent.com/srthk4370-IIITH/SoundExtension/main
 
 ## Uninstall (Linux/WSL)
 
-sed -i '/# >>> failure-hook START >>>/,/# <<< failure-hook END <<</d' ~/.bashrc
+sed -i '/# >>> failure-hook START >>>/,/# <<< failure-hook END <<</d' ~/.bashrc 
+
 rm -f ~/failure.wav
 
 ## Install (Windows PowerShell)
